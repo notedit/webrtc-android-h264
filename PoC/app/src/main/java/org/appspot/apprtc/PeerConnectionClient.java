@@ -36,6 +36,7 @@ import org.webrtc.AudioTrack;
 import org.webrtc.CameraVideoCapturer;
 import org.webrtc.DataChannel;
 import org.webrtc.EglBase;
+import org.webrtc.HardwareVideoDecoderFactory;
 import org.webrtc.IceCandidate;
 import org.webrtc.Logging;
 import org.webrtc.MediaConstraints;
@@ -300,7 +301,7 @@ public class PeerConnectionClient {
     this.options = options;
   }
 
-  public void createPeerConnectionFactory(final Context context,
+  public void createPeerConnectionFactory(final Context context, final EglBase.Context eglContext,
       final PeerConnectionParameters peerConnectionParameters, final PeerConnectionEvents events) {
     this.peerConnectionParameters = peerConnectionParameters;
     this.events = events;
@@ -327,7 +328,7 @@ public class PeerConnectionClient {
     executor.execute(new Runnable() {
       @Override
       public void run() {
-        createPeerConnectionFactoryInternal(context);
+        createPeerConnectionFactoryInternal(context, eglContext);
       }
     });
   }
@@ -376,7 +377,7 @@ public class PeerConnectionClient {
     return videoCallEnabled;
   }
 
-  private void createPeerConnectionFactoryInternal(Context context) {
+  private void createPeerConnectionFactoryInternal(Context context, EglBase.Context eglContext) {
     PeerConnectionFactory.initializeInternalTracer();
     if (peerConnectionParameters.tracing) {
       PeerConnectionFactory.startInternalTracingCapture(
@@ -507,7 +508,7 @@ public class PeerConnectionClient {
     if (options != null) {
       Log.d(TAG, "Factory networkIgnoreMask option: " + options.networkIgnoreMask);
     }
-    factory = new PeerConnectionFactory(options);
+    factory = new PeerConnectionFactory(options, null, new HardwareVideoDecoderFactory(eglContext));
     Log.d(TAG, "Peer connection factory created.");
   }
 
