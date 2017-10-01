@@ -10,6 +10,7 @@ android {
         versionCode rootProject.ext.releaseVersionCode
         versionName rootProject.ext.releaseVersionName
         applicationId "org.appspot.apprtc"
+        multiDexEnabled true
         testInstrumentationRunner "android.support.test.runner.AndroidJUnitRunner"
     }
     buildTypes {
@@ -22,11 +23,14 @@ android {
         sourceCompatibility JavaVersion.VERSION_1_8
         targetCompatibility JavaVersion.VERSION_1_8
     }
+    packagingOptions {
+        exclude 'META-INF/MANIFEST.MF'
+    }
 }
 
 dependencies {
     implementation fileTree(dir: 'libs', include: ['*.jar'])
-    implementation 'com.android.support:appcompat-v7:25.3.1'
+    implementation "com.android.support:appcompat-v7:${rootProject.ext.androidSupportSdkVersion}"
 
     implementation project(':audio_device_java')
     implementation project(':libjingle_peerconnection')

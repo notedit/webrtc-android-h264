@@ -37,6 +37,8 @@ class WrappedNativeI420Buffer implements VideoFrame.I420Buffer {
     this.dataV = dataV;
     this.strideV = strideV;
     this.nativeBuffer = nativeBuffer;
+
+    retain();
   }
 
   @Override
@@ -87,12 +89,12 @@ class WrappedNativeI420Buffer implements VideoFrame.I420Buffer {
 
   @Override
   public void retain() {
-    nativeAddRef(nativeBuffer);
+    JniCommon.nativeAddRef(nativeBuffer);
   }
 
   @Override
   public void release() {
-    nativeRelease(nativeBuffer);
+    JniCommon.nativeReleaseRef(nativeBuffer);
   }
 
   @Override
@@ -101,7 +103,4 @@ class WrappedNativeI420Buffer implements VideoFrame.I420Buffer {
     return VideoFrame.cropAndScaleI420(
         this, cropX, cropY, cropWidth, cropHeight, scaleWidth, scaleHeight);
   }
-
-  private static native long nativeAddRef(long nativeBuffer);
-  private static native long nativeRelease(long nativeBuffer);
 }

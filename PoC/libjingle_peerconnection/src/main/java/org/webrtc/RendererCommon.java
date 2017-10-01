@@ -34,6 +34,7 @@ public class RendererCommon {
   }
 
   /** Interface for rendering frames on an EGLSurface. */
+  @SuppressWarnings("StaticOrDefaultInterfaceMethod")
   public static interface GlDrawer {
     /**
      * Functions for drawing frames with different sources. The rendering surface target is
@@ -48,9 +49,37 @@ public class RendererCommon {
         int viewportX, int viewportY, int viewportWidth, int viewportHeight);
 
     /**
-     * Release all GL resources. This needs to be done manually, otherwise resources may leak.
+     * Draws a VideoFrame.TextureBuffer. Default implementation calls either drawOes or drawRgb
+     * depending on the type of the buffer. You can supply an additional render matrix. This is
+     * used multiplied together with the transformation matrix of the frame. (M = renderMatrix *
+     * transformationMatrix)
      */
-    void release();
+    default void
+      drawTexture(VideoFrame.TextureBuffer buffer, android.graphics.Matrix renderMatrix,
+          int frameWidth, int frameHeight, int viewportX, int viewportY, int viewportWidth,
+          int viewportHeight) {
+        android.graphics.Matrix finalMatrix =
+            new android.graphics.Matrix(buffer.getTransformMatrix());
+        finalMatrix.preConcat(renderMatrix);
+        float[] finalGlMatrix = convertMatrixFromAndroidGraphicsMatrix(finalMatrix);
+        switch (buffer.getType()) {
+          case OES:
+            drawOes(buffer.getTextureId(), finalGlMatrix, frameWidth, frameHeight, viewportX,
+                viewportY, viewportWidth, viewportHeight);
+            break;
+          case RGB:
+            drawRgb(buffer.getTextureId(), finalGlMatrix, frameWidth, frameHeight, viewportX,
+                viewportY, viewportWidth, viewportHeight);
+            break;
+          default:
+            throw new RuntimeException("Unknown texture type.");
+        }
+      }
+
+      /**
+       * Release all GL resources. This needs to be done manually, otherwise resources may leak.
+       */
+      void release();
   }
 
   /**
@@ -109,6 +138,12 @@ public class RendererCommon {
             planeHeights[i], 0, GLES20.GL_LUMINANCE, GLES20.GL_UNSIGNED_BYTE, packedByteBuffer);
       }
       return yuvTextures;
+    }
+
+    public int[] uploadFromBuffer(VideoFrame.I420Buffer buffer) {
+      int[] strides = {buffer.getStrideY(), buffer.getStrideU(), buffer.getStrideV()};
+      ByteBuffer[] planes = {buffer.getDataY(), buffer.getDataU(), buffer.getDataV()};
+      return uploadYuvData(buffer.getWidth(), buffer.getHeight(), strides, planes);
     }
 
     /**

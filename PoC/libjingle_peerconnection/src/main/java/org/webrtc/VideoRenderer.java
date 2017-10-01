@@ -104,6 +104,7 @@ public class VideoRenderer {
         this.yuvPlanes = null;
       } else {
         VideoFrame.I420Buffer i420Buffer = buffer.toI420();
+        buffer.release();
         this.yuvFrame = true;
         this.yuvStrides =
             new int[] {i420Buffer.getStrideY(), i420Buffer.getStrideU(), i420Buffer.getStrideV()};
@@ -134,6 +135,21 @@ public class VideoRenderer {
           ? "Y: " + yuvStrides[0] + ", U: " + yuvStrides[1] + ", V: " + yuvStrides[2]
           : "Texture: " + textureId;
       return width + "x" + height + ", " + type;
+    }
+
+    VideoFrame toVideoFrame() {
+      final VideoFrame.Buffer buffer;
+      if (yuvFrame) {
+        buffer = new I420BufferImpl(width, height, yuvPlanes[0], yuvStrides[0], yuvPlanes[1],
+            yuvStrides[1], yuvPlanes[2], yuvStrides[2],
+            () -> { VideoRenderer.renderFrameDone(this); });
+      } else {
+        // Note: surfaceTextureHelper being null means calling toI420 will crash.
+        buffer = new TextureBufferImpl(width, height, VideoFrame.TextureBuffer.Type.OES, textureId,
+            RendererCommon.convertMatrixToAndroidGraphicsMatrix(samplingMatrix),
+            null /* surfaceTextureHelper */, () -> { VideoRenderer.renderFrameDone(this); });
+      }
+      return new VideoFrame(buffer, rotationDegree, 0 /* timestampNs */);
     }
   }
 
