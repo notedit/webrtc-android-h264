@@ -32,6 +32,9 @@ dependencies {
     implementation fileTree(dir: 'libs', include: ['*.jar'])
     implementation "com.android.support:appcompat-v7:${rootProject.ext.androidSupportSdkVersion}"
 
+    implementation 'org.jcodec:jcodec:0.2.1'
+    implementation 'org.jcodec:jcodec-android:0.2.1'
+
     implementation project(':audio_device_java')
     implementation project(':libjingle_peerconnection')
 }

@@ -14,7 +14,7 @@ import java.nio.ByteBuffer;
 import org.webrtc.VideoFrame.I420Buffer;
 
 /** Implementation of an I420 VideoFrame buffer. */
-class I420BufferImpl implements VideoFrame.I420Buffer {
+public class I420BufferImpl implements VideoFrame.I420Buffer {
   private final int width;
   private final int height;
   private final ByteBuffer dataY;
@@ -29,7 +29,7 @@ class I420BufferImpl implements VideoFrame.I420Buffer {
   private int refCount;
 
   /** Constructs an I420Buffer backed by existing data. */
-  I420BufferImpl(int width, int height, ByteBuffer dataY, int strideY, ByteBuffer dataU,
+  public I420BufferImpl(int width, int height, ByteBuffer dataY, int strideY, ByteBuffer dataU,
       int strideU, ByteBuffer dataV, int strideV, Runnable releaseCallback) {
     this.width = width;
     this.height = height;
@@ -45,7 +45,7 @@ class I420BufferImpl implements VideoFrame.I420Buffer {
   }
 
   /** Allocates an empty I420Buffer suitable for an image of the given dimensions. */
-  static I420BufferImpl allocate(int width, int height) {
+  public static I420BufferImpl allocate(int width, int height) {
     int chromaHeight = (height + 1) / 2;
     int strideUV = (width + 1) / 2;
     int yPos = 0;

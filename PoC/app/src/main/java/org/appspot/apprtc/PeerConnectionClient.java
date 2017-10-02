@@ -512,7 +512,8 @@ public class PeerConnectionClient {
     if (options != null) {
       Log.d(TAG, "Factory networkIgnoreMask option: " + options.networkIgnoreMask);
     }
-    factory = new PeerConnectionFactory(options, null, new HardwareVideoDecoderFactory(eglContext));
+    factory = new PeerConnectionFactory(options, null, new SwAvcDecoderFactory(eglContext));
+//    factory = new PeerConnectionFactory(options, null, new HardwareVideoDecoderFactory(null));
     Log.d(TAG, "Peer connection factory created.");
   }
 
