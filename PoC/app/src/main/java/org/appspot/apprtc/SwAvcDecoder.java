@@ -78,12 +78,12 @@ public class SwAvcDecoder implements VideoDecoder {
 
     // this return value will make the logged name be
     // "(videodecoderwrapper.cc:171): XXPXX VideoDecode"
-    return "JCodec decoder OMX.qcom.video.decoder.avc";
+    //return "JCodec decoder OMX.qcom.video.decoder.avc";
 
     // this return value will make the logged name be something like
     // "�v�x"
     // and crash the process with error above
-    //return "JCodec decoder";
+    return "JCodec decoder";
   }
 
   private VideoFrame.Buffer copyI420Buffer(Frame frame, int width, int height) {
