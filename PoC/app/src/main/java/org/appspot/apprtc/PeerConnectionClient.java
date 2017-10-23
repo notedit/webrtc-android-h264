@@ -36,7 +36,6 @@ import org.webrtc.AudioTrack;
 import org.webrtc.CameraVideoCapturer;
 import org.webrtc.DataChannel;
 import org.webrtc.EglBase;
-import org.webrtc.HardwareVideoDecoderFactory;
 import org.webrtc.IceCandidate;
 import org.webrtc.Logging;
 import org.webrtc.MediaConstraints;
@@ -53,6 +52,7 @@ import org.webrtc.StatsObserver;
 import org.webrtc.StatsReport;
 import org.webrtc.VideoCapturer;
 import org.webrtc.VideoRenderer;
+import org.webrtc.VideoSink;
 import org.webrtc.VideoSource;
 import org.webrtc.VideoTrack;
 import org.webrtc.voiceengine.WebRtcAudioManager;
@@ -104,11 +104,15 @@ public class PeerConnectionClient {
   private static final int HD_VIDEO_HEIGHT = 720;
   private static final int BPS_IN_KBPS = 1000;
 
-  private static final PeerConnectionClient instance = new PeerConnectionClient();
+  // Executor thread is started once in private ctor and is used for all
+  // peer connection API calls to ensure new peer connection factory is
+  // created on the same thread as previously destroyed factory.
+  private static final ExecutorService executor = Executors.newSingleThreadExecutor();
+
   private final PCObserver pcObserver = new PCObserver();
   private final SDPObserver sdpObserver = new SDPObserver();
-  private final ExecutorService executor;
 
+  private final EglBase rootEglBase;
   private PeerConnectionFactory factory;
   private PeerConnection peerConnection;
   PeerConnectionFactory.Options options = null;
@@ -120,7 +124,7 @@ public class PeerConnectionClient {
   private boolean videoCapturerStopped;
   private boolean isError;
   private Timer statsTimer;
-  private VideoRenderer.Callbacks localRender;
+  private VideoSink localRender;
   private List<VideoRenderer.Callbacks> remoteRenders;
   private SignalingParameters signalingParameters;
   private MediaConstraints pcConstraints;
@@ -289,22 +293,15 @@ public class PeerConnectionClient {
     void onPeerConnectionError(final String description);
   }
 
-  private PeerConnectionClient() {
-    // Executor thread is started once in private ctor and is used for all
-    // peer connection API calls to ensure new peer connection factory is
-    // created on the same thread as previously destroyed factory.
-    executor = Executors.newSingleThreadExecutor();
-  }
-
-  public static PeerConnectionClient getInstance() {
-    return instance;
+  public PeerConnectionClient() {
+    rootEglBase = EglBase.create();
   }
 
   public void setPeerConnectionFactoryOptions(PeerConnectionFactory.Options options) {
     this.options = options;
   }
 
-  public void createPeerConnectionFactory(final Context context, final EglBase.Context eglContext,
+  public void createPeerConnectionFactory(final Context context,
       final PeerConnectionParameters peerConnectionParameters, final PeerConnectionEvents events) {
     this.peerConnectionParameters = peerConnectionParameters;
     this.events = events;
@@ -331,20 +328,20 @@ public class PeerConnectionClient {
     executor.execute(new Runnable() {
       @Override
       public void run() {
-        createPeerConnectionFactoryInternal(context, eglContext);
+        createPeerConnectionFactoryInternal(context);
       }
     });
   }
 
-  public void createPeerConnection(final EglBase.Context renderEGLContext,
-      final VideoRenderer.Callbacks localRender, final VideoRenderer.Callbacks remoteRender,
-      final VideoCapturer videoCapturer, final SignalingParameters signalingParameters) {
-    createPeerConnection(renderEGLContext, localRender, Collections.singletonList(remoteRender),
-        videoCapturer, signalingParameters);
+  public void createPeerConnection(final VideoSink localRender,
+      final VideoRenderer.Callbacks remoteRender, final VideoCapturer videoCapturer,
+      final SignalingParameters signalingParameters) {
+    createPeerConnection(
+        localRender, Collections.singletonList(remoteRender), videoCapturer, signalingParameters);
   }
-  public void createPeerConnection(final EglBase.Context renderEGLContext,
-      final VideoRenderer.Callbacks localRender, final List<VideoRenderer.Callbacks> remoteRenders,
-      final VideoCapturer videoCapturer, final SignalingParameters signalingParameters) {
+  public void createPeerConnection(final VideoSink localRender,
+      final List<VideoRenderer.Callbacks> remoteRenders, final VideoCapturer videoCapturer,
+      final SignalingParameters signalingParameters) {
     if (peerConnectionParameters == null) {
       Log.e(TAG, "Creating peer connection without initializing factory.");
       return;
@@ -358,7 +355,7 @@ public class PeerConnectionClient {
       public void run() {
         try {
           createMediaConstraintsInternal();
-          createPeerConnectionInternal(renderEGLContext);
+          createPeerConnectionInternal();
         } catch (Exception e) {
           reportError("Failed to create peer connection: " + e.getMessage());
           throw e;
@@ -380,15 +377,7 @@ public class PeerConnectionClient {
     return videoCallEnabled;
   }
 
-  private void createPeerConnectionFactoryInternal(Context context, EglBase.Context eglContext) {
-    PeerConnectionFactory.initializeInternalTracer();
-    if (peerConnectionParameters.tracing) {
-      PeerConnectionFactory.startInternalTracingCapture(
-          Environment.getExternalStorageDirectory().getAbsolutePath() + File.separator
-          + "webrtc-trace.txt");
-    }
-    Log.d(TAG,
-        "Create peer connection factory. Use video: " + peerConnectionParameters.videoCallEnabled);
+  private void createPeerConnectionFactoryInternal(Context context) {
     isError = false;
 
     // Initialize field trials.
@@ -427,8 +416,21 @@ public class PeerConnectionClient {
       }
     }
     Log.d(TAG, "Preferred video codec: " + preferredVideoCodec);
-    PeerConnectionFactory.initializeFieldTrials(fieldTrials);
-    Log.d(TAG, "Field trials: " + fieldTrials);
+
+    // Initialize WebRTC
+    Log.d(TAG,
+        "Initialize WebRTC. Field trials: " + fieldTrials + " Enable video HW acceleration: "
+            + peerConnectionParameters.videoCodecHwAcceleration);
+    PeerConnectionFactory.initialize(
+        PeerConnectionFactory.InitializationOptions.builder(context)
+            .setFieldTrials(fieldTrials)
+            .setEnableVideoHwAcceleration(peerConnectionParameters.videoCodecHwAcceleration)
+            .createInitializationOptions());
+    if (peerConnectionParameters.tracing) {
+      PeerConnectionFactory.startInternalTracingCapture(
+          Environment.getExternalStorageDirectory().getAbsolutePath() + File.separator
+          + "webrtc-trace.txt");
+    }
 
     // Check if ISAC is used by default.
     preferIsac = peerConnectionParameters.audioCodec != null
@@ -507,13 +509,12 @@ public class PeerConnectionClient {
     });
 
     // Create peer connection factory.
-    PeerConnectionFactory.initializeAndroidGlobals(
-        context, peerConnectionParameters.videoCodecHwAcceleration);
     if (options != null) {
       Log.d(TAG, "Factory networkIgnoreMask option: " + options.networkIgnoreMask);
     }
-    factory = new PeerConnectionFactory(options, null, new SwAvcDecoderFactory(eglContext));
+    factory = new PeerConnectionFactory(options, null, new SwAvcDecoderFactory(null));
 //    factory = new PeerConnectionFactory(options, null, new HardwareVideoDecoderFactory(null));
+//    factory = new PeerConnectionFactory(options);
     Log.d(TAG, "Peer connection factory created.");
   }
 
@@ -585,7 +586,7 @@ public class PeerConnectionClient {
     }
   }
 
-  private void createPeerConnectionInternal(EglBase.Context renderEGLContext) {
+  private void createPeerConnectionInternal() {
     if (factory == null || isError) {
       Log.e(TAG, "Peerconnection factory is not created");
       return;
@@ -596,8 +597,8 @@ public class PeerConnectionClient {
     queuedRemoteCandidates = new LinkedList<IceCandidate>();
 
     if (videoCallEnabled) {
-      Log.d(TAG, "EGLContext: " + renderEGLContext);
-      factory.setVideoHwAccelerationOptions(renderEGLContext, renderEGLContext);
+      factory.setVideoHwAccelerationOptions(
+          rootEglBase.getEglBaseContext(), rootEglBase.getEglBaseContext());
     }
 
     PeerConnection.RTCConfiguration rtcConfig =
@@ -625,9 +626,8 @@ public class PeerConnectionClient {
     }
     isInitiator = false;
 
-    // Set default WebRTC tracing and INFO libjingle logging.
+    // Set INFO libjingle logging.
     // NOTE: this _must_ happen while |factory| is alive!
-    Logging.enableTracing("logcat:", EnumSet.of(Logging.TraceLevel.TRACE_DEFAULT));
     Logging.enableLogToDebugOutput(Logging.Severity.LS_INFO);
 
     mediaStream = factory.createLocalMediaStream("ARDAMS");
@@ -700,6 +700,7 @@ public class PeerConnectionClient {
       factory = null;
     }
     options = null;
+    rootEglBase.release();
     Log.d(TAG, "Closing peer connection done.");
     events.onPeerConnectionClosed();
     PeerConnectionFactory.stopInternalTracingCapture();
@@ -713,6 +714,10 @@ public class PeerConnectionClient {
     }
 
     return videoWidth * videoHeight >= 1280 * 720;
+  }
+
+  public EglBase.Context getRenderContext() {
+    return rootEglBase.getEglBaseContext();
   }
 
   private void getStats() {
@@ -946,7 +951,7 @@ public class PeerConnectionClient {
 
     localVideoTrack = factory.createVideoTrack(VIDEO_TRACK_ID, videoSource);
     localVideoTrack.setEnabled(renderVideo);
-    localVideoTrack.addRenderer(new VideoRenderer(localRender));
+    localVideoTrack.addSink(localRender);
     return localVideoTrack;
   }
 
