@@ -69,13 +69,20 @@ public class SwAvcDecoder implements VideoDecoder {
 
   @Override
   public String getImplementationName() {
-    // if only return JCodec decoder,
+    // if only return "JCodec decoder",
     // signaling_thread crash with error:
     // JNI DETECTED ERROR IN APPLICATION:
     // input is not valid Modified UTF-8:
     // illegal continuation byte 0xff'
     // but no stack symbol available :(
+
+    // this return value will make the logged name be
+    // "(videodecoderwrapper.cc:171): XXPXX VideoDecode"
     return "JCodec decoder OMX.qcom.video.decoder.avc";
+
+    // this return value will make the logged name be something like
+    // "�v�x"
+    // and crash the process with error above
     //return "JCodec decoder";
   }
 

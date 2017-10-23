@@ -36,6 +36,7 @@ import org.webrtc.AudioTrack;
 import org.webrtc.CameraVideoCapturer;
 import org.webrtc.DataChannel;
 import org.webrtc.EglBase;
+import org.webrtc.HardwareVideoDecoderFactory;
 import org.webrtc.IceCandidate;
 import org.webrtc.Logging;
 import org.webrtc.MediaConstraints;
@@ -514,7 +515,6 @@ public class PeerConnectionClient {
     }
     factory = new PeerConnectionFactory(options, null, new SwAvcDecoderFactory(null));
 //    factory = new PeerConnectionFactory(options, null, new HardwareVideoDecoderFactory(null));
-//    factory = new PeerConnectionFactory(options);
     Log.d(TAG, "Peer connection factory created.");
   }
 
