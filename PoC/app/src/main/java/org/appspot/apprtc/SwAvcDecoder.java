@@ -13,15 +13,12 @@ import org.webrtc.VideoDecoder;
 import org.webrtc.VideoFrame;
 
 import java.nio.ByteBuffer;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 
 /**
  * Created by Piasy{github.com/Piasy} on 15/08/2017.
  */
 
 public class SwAvcDecoder implements VideoDecoder {
-  private ExecutorService decoderExecutor;
   private Callback callback;
   private H264Decoder decoder;
   private Picture out;
@@ -35,13 +32,11 @@ public class SwAvcDecoder implements VideoDecoder {
     out = Picture.create(settings.width, settings.height, ColorSpace.YUV420J);
     width = settings.width;
     height = settings.height;
-    decoderExecutor = Executors.newSingleThreadExecutor();
     return VideoCodecStatus.OK;
   }
 
   @Override
   public VideoCodecStatus release() {
-    decoderExecutor.shutdownNow();
     return VideoCodecStatus.OK;
   }
 
@@ -69,20 +64,6 @@ public class SwAvcDecoder implements VideoDecoder {
 
   @Override
   public String getImplementationName() {
-    // if only return "JCodec decoder",
-    // signaling_thread crash with error:
-    // JNI DETECTED ERROR IN APPLICATION:
-    // input is not valid Modified UTF-8:
-    // illegal continuation byte 0xff'
-    // but no stack symbol available :(
-
-    // this return value will make the logged name be
-    // "(videodecoderwrapper.cc:171): XXPXX VideoDecode"
-    //return "JCodec decoder OMX.qcom.video.decoder.avc";
-
-    // this return value will make the logged name be something like
-    // "�v�x"
-    // and crash the process with error above
     return "JCodec decoder";
   }
 
