@@ -37,6 +37,7 @@ import org.webrtc.CameraVideoCapturer;
 import org.webrtc.DataChannel;
 import org.webrtc.EglBase;
 import org.webrtc.HardwareVideoDecoderFactory;
+import org.webrtc.HardwareVideoEncoderFactory;
 import org.webrtc.IceCandidate;
 import org.webrtc.Logging;
 import org.webrtc.MediaConstraints;
@@ -513,8 +514,11 @@ public class PeerConnectionClient {
     if (options != null) {
       Log.d(TAG, "Factory networkIgnoreMask option: " + options.networkIgnoreMask);
     }
-    factory = new PeerConnectionFactory(options, null, new SwAvcDecoderFactory(null));
-//    factory = new PeerConnectionFactory(options, null, new HardwareVideoDecoderFactory(null));
+    factory = new PeerConnectionFactory(
+        options,
+        new SwAvcEncoderFactory(getRenderContext()),
+        new SwAvcDecoderFactory(getRenderContext())
+    );
     Log.d(TAG, "Peer connection factory created.");
   }
 
